@@ -1,0 +1,21 @@
+{
+  "name": "hausmajstor-premium",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Samostalan premium sajt za Haus Majstor Nemanja.",
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "check": "node tools/check.mjs",
+    "audit": "node tools/audit.mjs",
+    "assets": "node tools/prepare-assets.mjs",
+    "pages": "node tools/build-pages.mjs",
+    "check:pages": "node tools/check-pages.mjs"
+  },
+  "devDependencies": {
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@playwright/test": "^1.63.0",
+    "lighthouse": "^13.5.0",
+    "sharp": "^0.35.5"
+  }
+}
