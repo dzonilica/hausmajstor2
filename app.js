@@ -1,5 +1,12 @@
 'use strict';
 
+const siteHeader = document.querySelector('.site-header');
+function updateHeaderOnScroll() {
+  siteHeader?.classList.toggle('is-scrolled', window.scrollY > 24);
+}
+updateHeaderOnScroll();
+window.addEventListener('scroll', updateHeaderOnScroll, { passive: true });
+
 const menuToggle = document.querySelector('.menu-toggle');
 const mobileNav = document.querySelector('#mobile-nav');
 
