@@ -10,18 +10,18 @@ window.addEventListener('scroll', updateHeaderOnScroll, { passive: true });
 const menuToggle = document.querySelector('.menu-toggle');
 const mobileNav = document.querySelector('#mobile-nav');
 
+// The open menu needs a solid header behind it, even before the page scrolls.
+function setMenuOpen(open) {
+  menuToggle.setAttribute('aria-expanded', String(open));
+  menuToggle.setAttribute('aria-label', open ? 'Zatvori meni' : 'Otvori meni');
+  mobileNav.hidden = !open;
+  siteHeader.classList.toggle('is-menu-open', open);
+}
 function closeMenu() {
-  menuToggle.setAttribute('aria-expanded', 'false');
-  menuToggle.setAttribute('aria-label', 'Otvori meni');
-  mobileNav.hidden = true;
+  setMenuOpen(false);
 }
 
-menuToggle.addEventListener('click', () => {
-  const willOpen = menuToggle.getAttribute('aria-expanded') !== 'true';
-  menuToggle.setAttribute('aria-expanded', String(willOpen));
-  menuToggle.setAttribute('aria-label', willOpen ? 'Zatvori meni' : 'Otvori meni');
-  mobileNav.hidden = !willOpen;
-});
+menuToggle.addEventListener('click', () => setMenuOpen(menuToggle.getAttribute('aria-expanded') !== 'true'));
 mobileNav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
 document.addEventListener('click', event => {
   if (!event.target.closest('.site-header')) closeMenu();
