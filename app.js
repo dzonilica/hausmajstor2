@@ -9,31 +9,64 @@ window.addEventListener('scroll', updateHeaderOnScroll, { passive: true });
 
 const menuToggle = document.querySelector('.menu-toggle');
 const mobileNav = document.querySelector('#mobile-nav');
+const menuReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const desktopMenuViewport = window.matchMedia('(min-width: 901px)');
+let menuCloseTimer;
 
-// The open menu needs a solid header behind it, even before the page scrolls.
-function setMenuOpen(open) {
+function finishClosingMenu() {
+  clearTimeout(menuCloseTimer);
+  mobileNav.hidden = true;
+  siteHeader.classList.remove('is-menu-open');
+}
+
+// Keep the panel and solid header visible until the closing transition finishes.
+function setMenuOpen(open, immediate = false) {
+  if (open === (menuToggle.getAttribute('aria-expanded') === 'true')) {
+    if (!open && immediate) finishClosingMenu();
+    return;
+  }
+  clearTimeout(menuCloseTimer);
   menuToggle.setAttribute('aria-expanded', String(open));
   menuToggle.setAttribute('aria-label', open ? 'Zatvori meni' : 'Otvori meni');
-  mobileNav.hidden = !open;
-  siteHeader.classList.toggle('is-menu-open', open);
+  mobileNav.inert = !open;
+  if (open) {
+    mobileNav.hidden = false;
+    siteHeader.classList.add('is-menu-open');
+    // Establish the starting styles after removing hidden, including on rapid reopen.
+    mobileNav.getBoundingClientRect();
+    mobileNav.classList.add('is-visible');
+  } else {
+    mobileNav.classList.remove('is-visible');
+    if (immediate || menuReducedMotion.matches) finishClosingMenu();
+    else menuCloseTimer = setTimeout(finishClosingMenu, 400);
+  }
 }
-function closeMenu() {
-  setMenuOpen(false);
+function closeMenu(immediate = false) {
+  setMenuOpen(false, immediate);
 }
 
 menuToggle.addEventListener('click', () => setMenuOpen(menuToggle.getAttribute('aria-expanded') !== 'true'));
-mobileNav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+mobileNav.querySelectorAll('a').forEach((link, index) => {
+  link.style.setProperty('--menu-order', index);
+  link.addEventListener('click', () => closeMenu());
+});
+mobileNav.addEventListener('transitionend', event => {
+  if (event.target === mobileNav && event.propertyName === 'opacity' && menuToggle.getAttribute('aria-expanded') === 'false') finishClosingMenu();
+});
+menuReducedMotion.addEventListener('change', event => {
+  if (event.matches && menuToggle.getAttribute('aria-expanded') === 'false') finishClosingMenu();
+});
 document.addEventListener('click', event => {
   if (!event.target.closest('.site-header')) closeMenu();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !mobileNav.hidden) {
+  if (event.key === 'Escape' && menuToggle.getAttribute('aria-expanded') === 'true') {
     closeMenu();
     menuToggle.focus();
   }
 });
-window.matchMedia('(min-width: 901px)').addEventListener('change', event => {
-  if (event.matches) closeMenu();
+desktopMenuViewport.addEventListener('change', event => {
+  if (event.matches) closeMenu(true);
 });
 
 const serviceVisuals = {
