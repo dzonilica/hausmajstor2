@@ -62,7 +62,8 @@ try {
   assert.equal(await page.locator('#gallery-dialog').isVisible(), true);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#gallery-dialog').isVisible(), false);
-  assert.equal(await page.locator('body').evaluate(body => body.classList.contains('modal-open')), false);
+  // The dialog's close event is queued as a task, so wait for it instead of racing it.
+  await page.waitForFunction(() => !document.body.classList.contains('modal-open'), null, { timeout: 2000 });
   await page.locator('summary').first().click();
   assert.equal(await page.locator('details').first().getAttribute('open'), '');
   report('Gallery and FAQ', 'Image dialog opens and Escape restores scrolling; FAQ expands');

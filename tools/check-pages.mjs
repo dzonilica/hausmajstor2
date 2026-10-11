@@ -73,10 +73,13 @@ try {
   await page.locator('[data-gallery-filter="real"]').click();
   assert.equal(await page.locator('[data-gallery-kind]:visible').count(),1);
   await page.locator('[data-gallery-filter="concept"]').click();
-  assert.equal(await page.locator('[data-gallery-kind]:visible').count(),3);
-  await page.locator('[data-gallery-filter="all"]').click();
+  assert.equal(await page.locator('[data-gallery-kind]:visible').count(),6);
+  await page.locator('[data-gallery-filter="garaze"]').click();
   assert.equal(await page.locator('[data-gallery-kind]:visible').count(),4);
-  for(const name of ['Drvene baštice','Nadstrešnice','Letnjikovci','Garaže']){
+  assert.equal(await page.locator('[data-gallery-kind]:visible:not([data-gallery-category="garaze"])').count(),0);
+  await page.locator('[data-gallery-filter="all"]').click();
+  assert.equal(await page.locator('[data-gallery-kind]:visible').count(),7);
+  for(const name of ['Drvene baštice','Nadstrešnice','Letnjikovci','Garaže','Grafitna garaža','Garaža sa drvetom','Dupla garaža']){
     const button=page.getByRole('button',{name:'Uvećaj: '+name,exact:true});
     const expected=await button.getAttribute('data-gallery-src');
     await button.click();
@@ -86,11 +89,28 @@ try {
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#gallery-dialog').isVisible(),false);
   }
-  pass('Gallery filters and all four enlarged photographs work');
+  pass('Gallery filters and all seven enlarged photographs work');
+
+  await page.goto(base+'garaze.html');
+  assert.equal(await page.locator('.garage-concept-grid [data-open-gallery]').count(),3);
+  for (const name of ['Grafitna garaža','Garaža sa drvetom','Dupla garaža']) {
+    const button=page.getByRole('button',{name:'Uvećaj: '+name,exact:true});
+    const expected=await button.getAttribute('data-gallery-src');
+    await button.click();
+    assert.equal(await page.locator('#gallery-dialog').isVisible(),true);
+    assert.equal(await page.locator('#gallery-dialog img').getAttribute('src'),expected);
+    await page.locator('#gallery-dialog img').evaluate(image=>image.decode());
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#gallery-dialog').isVisible(),false);
+  }
+  pass('All three garage concepts open their correct photographs on the garage page');
+
 
   for(const [slug,name] of Object.entries({nadstresnice:'Nadstrešnica',letnjikovci:'Letnjikovac',garaze:'Garaža',bastice:'Drvena baštica'})){
     await page.goto(base+slug+'.html');
     await page.getByRole('link',{name:'Zatražite predlog'}).click();
+    // The deferred script preselects the service; read the form only after the page has loaded.
+    await page.waitForURL(/kontakt\.html\?usluga=/);
     assert.equal(await page.locator('#project-type').inputValue(),name);
     await page.locator('#client-name').fill('Milica');
     await page.locator('#project-location').fill('Novi Sad');
@@ -106,6 +126,7 @@ try {
 
   await page.goto(new URL('garaze.html',root).href);
   await page.getByRole('link',{name:'Zatražite predlog'}).click();
+  await page.waitForURL(/kontakt\.html\?usluga=/);
   assert.equal(await page.locator('#project-type').inputValue(),'Garaža');
   pass('Navigation and service selection also work directly with file://');
   await page.close();

@@ -1,7 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { argv } from 'node:process';
+import { buildDrawing, shortcutIcon, jointDrawing } from './build-drawings.mjs';
 
 const root = new URL('../', import.meta.url);
 const arrow = '<span aria-hidden="true">↗</span>';
+// Multi-line page titles are split so each line can rise into view like the homepage headline.
+const lines = title => title.split('<br>').map((line, index, all) => `<span class="hero-line"><span>${line}${index < all.length - 1 ? ' ' : ''}</span></span>`).join('');
 const esc = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 
 const services = [
@@ -47,6 +51,51 @@ const services = [
   }
 ];
 
+const garageConcepts = [
+  {
+    "slug": "garaze",
+    "name": "Grafitna garaža",
+    "image": "garaza-grafit.webp",
+    "smallImage": "garaza-grafit-small.webp",
+    "width": 1536,
+    "height": 1024,
+    "alt": "Idejna vizualizacija moderne grafitne garaže sa ravnim krovom, drvenim detaljima i osvetljenim prilazom",
+    "caption": "Idejna vizualizacija: grafitna garaža sa čistim linijama i toplim drvenim detaljima.",
+    "position": "center"
+  },
+  {
+    "slug": "garaze",
+    "name": "Garaža sa drvetom",
+    "image": "garaza-drvo.webp",
+    "smallImage": "garaza-drvo-small.webp",
+    "width": 1536,
+    "height": 1024,
+    "alt": "Idejna vizualizacija savremene garaže sa fasadom od drvenih letvica i tamnim garažnim vratima",
+    "caption": "Idejna vizualizacija: garaža sa drvenom oblogom, uklopljena u zeleno dvorište.",
+    "position": "center"
+  },
+  {
+    "slug": "garaze",
+    "name": "Dupla garaža",
+    "image": "garaza-dupla.webp",
+    "smallImage": "garaza-dupla-small.webp",
+    "width": 1536,
+    "height": 1024,
+    "alt": "Idejna vizualizacija moderne duple garaže sa dva odvojena ulaza i ravnim krovom",
+    "caption": "Idejna vizualizacija: dupla garaža sa dva ulaza i dodatnim prostorom.",
+    "position": "center"
+  }
+];
+const originalGarage = { ...services[2] };
+Object.assign(services[2], {
+  image: garageConcepts[0].image,
+  smallImage: garageConcepts[0].smallImage,
+  width: 1536,
+  height: 1024,
+  alt: garageConcepts[0].alt,
+  caption: garageConcepts[0].caption
+});
+
 let home = await readFile(new URL('index.html',root),'utf8');
 let homeHeader = home.match(/<header class="site-header">[\s\S]*?<\/header>/)[0];
 const navRoutes = {usluge:'usluge.html',pristup:'o-nama.html',radovi:'radovi.html',kontakt:'kontakt.html'};
@@ -65,30 +114,46 @@ home = home.replace('Jedan od naših radova, spreman za nove sezone.</p></div>',
 const directory = `<div class="footer-directory"><div><p>Istražite</p><a href="index.html">Početna</a><a href="usluge.html">Šta pravimo</a><a href="o-nama.html">Naš pristup</a><a href="radovi.html">Radovi i ideje</a></div><div><p>Izrada po meri</p>${services.map(s=>`<a href="${s.slug}.html">${s.name}</a>`).join('')}</div><div><p>Tu smo za vašu ideju.</p><a class="footer-phone" href="tel:+381616669378">061 666 9378 ${arrow}</a><a href="kontakt.html">Kontakt i upit ${arrow}</a><span>Srbija · dolazak na teren</span></div></div>`;
 if (!home.includes('class="footer-directory"')) home = home.replace('<footer class="site-footer container">','<footer class="site-footer container">'+directory);
 if (!home.includes('href="pages.css"')) home = home.replace('<link rel="stylesheet" href="styles.css">','<link rel="stylesheet" href="styles.css">\n  <link rel="stylesheet" href="pages.css">');
-await writeFile(new URL('index.html',root),home);
+// The process section opens with a construction sketch; each service page shows its own structure.
+const processIntro = /(<section class="process section container"[^>]*>)\s*(?:<div class="process-intro">)?(<div class="section-heading" data-reveal><h2 id="process-title">[\s\S]*?<\/div>)(?:<figure class="build-drawing"[\s\S]*?<\/figure><\/div>)?/;
+home = home.replace(processIntro,(_,open,heading)=>`${open}\n      <div class="process-intro">${heading}${buildDrawing('nadstresnice')}</div>`);
+// Shortcuts under the hero carry a small drawing of each service; the craft section shows the joint.
+home = home.replace(/<div class="service-shortcuts"[\s\S]*?<\/div>/,()=>`<div class="service-shortcuts" aria-label="Brzi izbor usluge" data-reveal>\n${services.map(s=>`      <a href="${s.slug}.html">${shortcutIcon(s.slug)}${s.name} ${arrow}</a>`).join('\n')}\n    </div>`);
+home = home.replace(/(<div class="craft-principles">[\s\S]*?<\/div><\/div>)(?:<figure class="joint-drawing"[\s\S]*?<\/figure>)?(?=\s*<div class="signature">)/,(_,principles)=>principles+jointDrawing());
+if (!argv.includes('--inner-only')) await writeFile(new URL('index.html',root),home);
 
 const header = active => homeHeader.replaceAll('href="#pocetna"','href="index.html"').replaceAll(`href="${active}"`,`href="${active}" aria-current="page"`);
 const footer = home.match(/<footer class="site-footer container">[\s\S]*?<\/footer>/)[0].replace('class="brand" href="#pocetna"','class="brand" href="index.html"').replace('class="back-top" href="#pocetna"','class="back-top" href="#sadrzaj"').replace('Hero i prikaz spoja su idejne vizualizacije.','Fotografije idejnih rešenja označene su u opisu.');
 const messageDialog = home.match(/<dialog id="message-dialog"[\s\S]*?<\/dialog>/)[0];
 const galleryDialog = home.match(/<dialog id="gallery-dialog"[\s\S]*?<\/dialog>/)[0].replace('aria-label="Fotografija drvenih baštica"','aria-label="Uvećana fotografija"');
 const process = home.match(/<section class="process section container"[\s\S]*?<\/section>/)[0].replace('class="process section container"','class="process section container page-process" id="izrada"');
+const processWith = slug => process.replace(/<figure class="build-drawing"[\s\S]*?<\/figure>/,()=>buildDrawing(slug));
 
 function crumbs(label, service=false) {
   return `<nav class="breadcrumbs container" aria-label="Putanja stranice"><a href="index.html">Početna</a><span aria-hidden="true">/</span>${service?'<a href="usluge.html">Šta pravimo</a><span aria-hidden="true">/</span>':''}<span aria-current="page">${label}</span></nav>`;
 }
 function photo(service, eager=false) {
-  return `<figure class="page-photo ${service.real?'page-photo-real':''}"><div class="page-photo-frame"><img src="assets/${service.image}" alt="${service.alt}" width="1200" height="900" style="object-position:${service.position}" ${eager?'fetchpriority="high"':'loading="lazy"'}></div><figcaption>${service.caption}</figcaption></figure>`;
+  const responsive = service.smallImage ? ` srcset="assets/${service.smallImage} 768w, assets/${service.image} 1536w" sizes="(max-width: 767px) calc(100vw - 40px), 50vw"` : '';
+  return `<figure class="page-photo ${service.real?'page-photo-real':''}"><div class="page-photo-frame"><img src="assets/${service.image}"${responsive} alt="${service.alt}" width="${service.width || 1200}" height="${service.height || 900}" style="object-position:${service.position}" ${eager?'fetchpriority="high"':'loading="lazy"'}></div><figcaption>${service.caption}</figcaption></figure>`;
+}
+function portfolioCard(s, index=2, {sizes="(max-width: 767px) calc(100vw - 40px), (max-width: 1352px) calc(50vw - 74px), 602px", heading="h2", inquiry=false}={}) {
+  const responsive = s.smallImage ? ` srcset="assets/${s.smallImage} 768w, assets/${s.image} 1536w" sizes="${sizes}"` : '';
+  const link = inquiry ? `kontakt.html?usluga=${s.slug}` : `${s.slug}.html`;
+  return `<article class="portfolio-item ${s.real?'portfolio-real':''}" data-gallery-kind="${s.real?'real':'concept'}" data-gallery-category="${s.slug}" data-reveal><button type="button" class="portfolio-image" data-open-gallery data-gallery-src="assets/${s.real?'bastice-original.jpg':s.image}" data-gallery-alt="${s.alt}" data-gallery-caption="${s.caption}" aria-label="Uvećaj: ${s.name}"><img src="assets/${s.smallImage || s.image}"${responsive} alt="${s.alt}" width="${s.width || 800}" height="${s.height || 600}" ${index<2?'fetchpriority="high"':'loading="lazy"'} decoding="async" style="object-position:${s.position}"></button><div class="portfolio-title"><div><p>${s.real?'IZVEDENI RAD':'IDEJNA VIZUALIZACIJA'}</p><${heading}>${s.name}</${heading}></div><a class="text-link" href="${link}">${inquiry?'Vaša ideja':'O usluzi'} ${arrow}</a></div></article>`;
+}
+function garageIdeas() {
+  return `<section class="garage-concepts section container" id="garaze-ideje" aria-labelledby="garage-concepts-title"><div class="section-heading" data-reveal><p class="eyebrow">TRI IDEJE ZA NOVI PROSTOR</p><h2 id="garage-concepts-title">Tri stila. Vaša garaža.</h2><p>Grafit, prirodno drvo ili prostor za dva automobila. Idejne vizualizacije kao polazna tačka za vašu garažu po meri.</p></div><div class="garage-concept-grid portfolio-grid">${garageConcepts.map(s=>portfolioCard(s,2,{sizes:"(max-width: 767px) calc(100vw - 40px), (max-width: 1352px) calc(33.333vw - 61px), 390px",heading:"h3",inquiry:true})).join('')}</div></section>`;
 }
 function questions(items, title='Pre nego što počnemo.') {
   return `<section class="faq section container page-faq"><h2 data-reveal>${title}</h2><div class="faq-list" data-reveal>${items.map(([q,a])=>`<details><summary>${q}<span aria-hidden="true">+</span></summary><p>${a}</p></details>`).join('')}</div></section>`;
 }
 function contactBand(title='Hajde da razradimo vašu ideju.',slug='') {
-  return `<section class="page-contact-band"><div class="container"><h2>${title}</h2><a class="button button-green" href="kontakt.html${slug?'?usluga='+slug:''}">Razgovarajmo ${arrow}</a></div></section>`;
+  return `<section class="page-contact-band"><div class="container"><h2 data-reveal>${title}</h2><a class="button button-green" data-reveal href="kontakt.html${slug?'?usluga='+slug:''}">Razgovarajmo ${arrow}</a></div></section>`;
 }
 function related(exclude) {
   const index = services.findIndex(s=>s.slug===exclude);
   const items = [services[(index+1)%4],services[(index+2)%4]];
-  return `<section class="related section container"><h2>I još poneka mogućnost.</h2><div class="related-grid">${items.map(s=>`<a href="${s.slug}.html" class="related-item"><img src="assets/${s.image}" alt="${s.alt}" width="560" height="320" loading="lazy"><div><h3>${s.name}</h3>${arrow}</div><p>${s.real?'Izvedeni rad':'Idejno rešenje'}</p></a>`).join('')}</div></section>`;
+  return `<section class="related section container"><h2 data-reveal>I još poneka mogućnost.</h2><div class="related-grid">${items.map(s=>`<a href="${s.slug}.html" class="related-item" data-reveal><span class="related-image"><img src="assets/${s.image}" alt="${s.alt}" width="560" height="320" loading="lazy"></span><div><h3>${s.name}</h3>${arrow}</div><p>${s.real?'Izvedeni rad':'Idejno rešenje'}</p></a>`).join('')}</div></section>`;
 }
 function documentPage({title,description,active,content,dialogs='',image='hero-pergola.webp',bodyClass=''}) {
   return `<!doctype html>
@@ -98,25 +163,25 @@ function documentPage({title,description,active,content,dialogs='',image='hero-p
 
 for (const s of services) {
   const content = `${crumbs(s.name,true)}
-    <section class="page-hero container" aria-labelledby="page-title"><div class="page-hero-copy"><h1 id="page-title">${s.title}</h1><p>${s.intro}</p><a class="button button-green" href="kontakt.html?usluga=${s.slug}">Zatražite predlog ${arrow}</a><a class="page-secondary-link" href="#izrada">Kako izgleda izrada <span aria-hidden="true">↓</span></a></div>${photo(s,true)}</section>
+    <section class="page-hero container" aria-labelledby="page-title"><div class="page-hero-copy"><h1 id="page-title">${lines(s.title)}</h1><p>${s.intro}</p><a class="button button-green" href="kontakt.html?usluga=${s.slug}">Zatražite predlog ${arrow}</a><a class="page-secondary-link" href="#izrada">Kako izgleda izrada <span aria-hidden="true">↓</span></a></div>${photo(s,true)}</section>
     <section class="service-options section container"><div class="section-heading" data-reveal><h2>${s.heading}</h2><p>${s.body}</p></div><div class="options-grid">${s.choices.map(([title,body])=>`<article data-reveal><h3>${title}</h3><p>${body}</p></article>`).join('')}</div></section>
     <section class="prepare-section"><div class="container prepare-grid"><div data-reveal><h2>Počnimo od<br>vašeg prostora.</h2><p>Nije vam potreban gotov projekat. Za prvi razgovor dovoljno je nekoliko osnovnih informacija.</p></div><ul class="preparation-list" data-reveal>${s.prepare.map(line=>`<li>${line}</li>`).join('')}</ul></div></section>
-    ${process}${questions(s.faqs)}${contactBand('Vaš prostor. Vaše rešenje.',s.slug)}${related(s.slug)}`;
-  await writeFile(new URL(`${s.slug}.html`,root),documentPage({title:s.name+' po meri',description:s.description,active:'usluge.html',content,image:s.image,bodyClass:'service-page'}));
+    ${s.slug==='garaze'?garageIdeas():''}${processWith(s.slug)}${questions(s.faqs)}${contactBand('Vaš prostor. Vaše rešenje.',s.slug)}${related(s.slug)}`;
+  await writeFile(new URL(`${s.slug}.html`,root),documentPage({title:s.name+' po meri',description:s.description,active:'usluge.html',content,image:s.image,bodyClass:'service-page',dialogs:s.slug==='garaze'?galleryDialog:''}));
 }
 
-const servicesContent = `${crumbs('Šta pravimo')}<section class="page-intro container"><h1>Pravljeno za<br>vaš način života.</h1><p>Od male baštice do novog prostora za okupljanje. Izaberite odakle počinjemo, a detalje ćemo oblikovati zajedno.</p></section><section class="service-catalog container" aria-label="Naše usluge">${services.map((s,i)=>`<article class="catalog-item" data-reveal><a class="catalog-image" href="${s.slug}.html" aria-label="${s.name}, pogledajte detalje"><img src="assets/${s.image}" alt="${s.alt}" width="800" height="650" ${i<2?'fetchpriority="high"':'loading="lazy"'} style="object-position:${s.position}"></a><p class="image-note">${s.real?'Fotografija izvedenog rada':'Idejna vizualizacija'}</p><div class="catalog-title"><h2><a href="${s.slug}.html">${s.name}</a></h2><a class="round-link" href="${s.slug}.html" aria-label="Saznajte više: ${s.name}">${arrow}</a></div><p>${s.intro}</p></article>`).join('')}</section><section class="service-help section container"><h2>Još tražite pravo rešenje?</h2><p>Pošaljite fotografiju prostora i napišite kako biste želeli da ga koristite. To je dovoljno za prvi razgovor.</p><a class="text-link" href="kontakt.html">Opišite nam svoju ideju ${arrow}</a></section>${process}`;
+const servicesContent = `${crumbs('Šta pravimo')}<section class="page-intro container"><h1>${lines('Pravljeno za<br>vaš način života.')}</h1><p>Od male baštice do novog prostora za okupljanje. Izaberite odakle počinjemo, a detalje ćemo oblikovati zajedno.</p></section><section class="service-catalog container" aria-label="Naše usluge">${services.map((s,i)=>`<article class="catalog-item" data-reveal><a class="catalog-image" href="${s.slug}.html" aria-label="${s.name}, pogledajte detalje"><img src="assets/${s.image}" alt="${s.alt}" width="800" height="650" ${i<2?'fetchpriority="high"':'loading="lazy"'} style="object-position:${s.position}"></a><p class="image-note">${s.real?'Fotografija izvedenog rada':'Idejna vizualizacija'}</p><div class="catalog-title"><h2><a href="${s.slug}.html">${s.name}</a></h2><a class="round-link" href="${s.slug}.html" aria-label="Saznajte više: ${s.name}">${arrow}</a></div><p>${s.intro}</p></article>`).join('')}</section><section class="service-help section container"><h2 data-reveal>Još tražite pravo rešenje?</h2><p data-reveal>Pošaljite fotografiju prostora i napišite kako biste želeli da ga koristite. To je dovoljno za prvi razgovor.</p><a class="text-link" data-reveal href="kontakt.html">Opišite nam svoju ideju ${arrow}</a></section>${processWith('letnjikovci')}`;
 await writeFile(new URL('usluge.html',root),documentPage({title:'Šta pravimo',description:'Istražite nadstrešnice, letnjikovce, montažne garaže i drvene baštice po meri. Haus Majstor Nemanja.',active:'usluge.html',content:servicesContent}));
 
 const aboutPhoto={image:'detalj-drveta.webp',alt:'Idejni detalj drvene grede i metalnog spoja',position:'35% center',caption:'Pažnja prema spoju počinje mnogo pre montaže. Idejna vizualizacija.'};
-const aboutContent=`${crumbs('Naš pristup')}<section class="page-hero container"><div class="page-hero-copy"><h1>Vaša ideja.<br>Naš zanat.</h1><p>Ja sam Nemanja. Od prvog razgovora do montaže, vaš projekat ima svog majstora.</p><a class="button button-green" href="kontakt.html">Upoznajmo vaš projekat ${arrow}</a></div>${photo(aboutPhoto,true)}</section><section class="about-statement section container"><h2>Pravimo stvari<br>koje ćete koristiti.</h2><div><p>Da je terasa prijatna za sedenje. Da se vrata garaže otvaraju bez smetnje. Da baštici možete da priđete sa svih strana.</p><p>Takvi detalji određuju kako prostor zaista funkcioniše. Zato prvo slušamo šta vam treba, zatim merimo i predlažemo rešenje.</p><p>Radimo sa drvetom i metalom. Biramo materijale i završnu obradu prema nameni, uz dogovor o izgledu, ceni i roku.</p></div></section><section class="values-section"><div class="container"><h2>Na čemu se zasniva naš rad.</h2><div class="values-grid"><article><h3>Razgovor pre svega.</h3><p>Vaša ideja, navike i prostor usmeravaju projekat. Postavljamo pitanja pre nego što predložimo rešenje.</p></article><article><h3>Svaki prostor ima svoju meru.</h3><p>Prilagođavamo dimenzije i detalje stvarnim uslovima na lokaciji.</p></article><article><h3>Dogovor bez nejasnoća.</h3><p>Preciziramo obim posla, materijale, cenu i rok pre izrade.</p></article><article><h3>Pažnja do poslednjeg spoja.</h3><p>Prolazimo kroz izvedene detalje i razgovaramo o održavanju vašeg novog prostora.</p></article></div></div></section>${process}${contactBand('Dobar početak je jedan razgovor.')}<section class="about-work-link section container"><div><h2>Pogledajte šta pravimo.</h2><p>Upoznajte usluge i pronađite ideju za svoje dvorište.</p></div><a class="text-link" href="radovi.html">Radovi i ideje ${arrow}</a></section>`;
+const aboutContent=`${crumbs('Naš pristup')}<section class="page-hero container"><div class="page-hero-copy"><h1>${lines('Vaša ideja.<br>Naš zanat.')}</h1><p>Ja sam Nemanja. Od prvog razgovora do montaže, vaš projekat ima svog majstora.</p><a class="button button-green" href="kontakt.html">Upoznajmo vaš projekat ${arrow}</a></div>${photo(aboutPhoto,true)}</section><section class="about-statement section container"><h2 data-reveal>Pravimo stvari<br>koje ćete koristiti.</h2><div data-reveal><p>Da je terasa prijatna za sedenje. Da se vrata garaže otvaraju bez smetnje. Da baštici možete da priđete sa svih strana.</p><p>Takvi detalji određuju kako prostor zaista funkcioniše. Zato prvo slušamo šta vam treba, zatim merimo i predlažemo rešenje.</p><p>Radimo sa drvetom i metalom. Biramo materijale i završnu obradu prema nameni, uz dogovor o izgledu, ceni i roku.</p></div></section><section class="values-section"><div class="container"><h2 data-reveal>Na čemu se zasniva naš rad.</h2><div class="values-grid"><article data-reveal><h3>Razgovor pre svega.</h3><p>Vaša ideja, navike i prostor usmeravaju projekat. Postavljamo pitanja pre nego što predložimo rešenje.</p></article><article data-reveal><h3>Svaki prostor ima svoju meru.</h3><p>Prilagođavamo dimenzije i detalje stvarnim uslovima na lokaciji.</p></article><article data-reveal><h3>Dogovor bez nejasnoća.</h3><p>Preciziramo obim posla, materijale, cenu i rok pre izrade.</p></article><article data-reveal><h3>Pažnja do poslednjeg spoja.</h3><p>Prolazimo kroz izvedene detalje i razgovaramo o održavanju vašeg novog prostora.</p></article></div></div></section>${processWith('bastice')}${contactBand('Dobar početak je jedan razgovor.')}<section class="about-work-link section container"><div data-reveal><h2>Pogledajte šta pravimo.</h2><p>Upoznajte usluge i pronađite ideju za svoje dvorište.</p></div><a class="text-link" data-reveal href="radovi.html">Radovi i ideje ${arrow}</a></section>`;
 await writeFile(new URL('o-nama.html',root),documentPage({title:'Naš pristup',description:'Upoznajte Nemanju i način rada Haus Majstora. Pažljivo merenje, jasan dogovor i izrada za vaš prostor.',active:'o-nama.html',content:aboutContent,image:'detalj-drveta.webp'}));
 
-const galleryItems = [services[3],services[0],services[1],services[2]];
-const worksContent = `${crumbs('Radovi i ideje')}<section class="page-intro container"><h1>Izrađeno rukama.<br>Zamišljeno za vas.</h1><p>Pogledajte izvedene baštice i idejna rešenja za druge delove dvorišta. Uz svaku fotografiju je označeno šta prikazuje.</p></section><section class="portfolio-section container" aria-label="Galerija"><div class="gallery-filters" role="group" aria-label="Prikažite fotografije"><button type="button" data-gallery-filter="all" aria-pressed="true">Sve fotografije</button><button type="button" data-gallery-filter="real" aria-pressed="false">Izvedeni radovi</button><button type="button" data-gallery-filter="concept" aria-pressed="false">Idejna rešenja</button></div><p id="gallery-status" class="sr-only" role="status" aria-live="polite">Broj prikazanih fotografija: 4.</p><div class="portfolio-grid">${galleryItems.map((s,i)=>`<article class="portfolio-item ${s.real?'portfolio-real':''}" data-gallery-kind="${s.real?'real':'concept'}"><button type="button" class="portfolio-image" data-open-gallery data-gallery-src="assets/${s.real?'bastice-original.jpg':s.image}" data-gallery-alt="${s.alt}" data-gallery-caption="${s.caption}" aria-label="Uvećaj: ${s.name}"><img src="assets/${s.image}" alt="${s.alt}" width="800" height="600" ${i<2?'fetchpriority="high"':'loading="lazy"'} style="object-position:${s.position}"></button><div class="portfolio-title"><div><p>${s.real?'IZVEDENI RAD':'IDEJNA VIZUALIZACIJA'}</p><h2>${s.name}</h2></div><a class="text-link" href="${s.slug}.html">O usluzi ${arrow}</a></div></article>`).join('')}</div></section>${contactBand('Prepoznajete nešto za svoje dvorište?')}`;
+const galleryItems = [services[3],services[0],services[1],originalGarage,...garageConcepts];
+const worksContent = `${crumbs('Radovi i ideje')}<section class="page-intro container"><h1>${lines('Izrađeno rukama.<br>Zamišljeno za vas.')}</h1><p>Pogledajte izvedene baštice i idejna rešenja za vaše dvorište — od nadstrešnica do modernih garaža. Uz svaku fotografiju je označeno šta prikazuje.</p></section><section class="portfolio-section container" aria-label="Galerija"><div class="gallery-filters" role="group" aria-label="Prikažite fotografije"><button type="button" data-gallery-filter="all" aria-pressed="true">Sve fotografije</button><button type="button" data-gallery-filter="real" aria-pressed="false">Izvedeni radovi</button><button type="button" data-gallery-filter="concept" aria-pressed="false">Idejna rešenja</button><button type="button" data-gallery-filter="garaze" aria-pressed="false">Garaže</button></div><p id="gallery-status" class="sr-only" role="status" aria-live="polite">Broj prikazanih fotografija: ${galleryItems.length}.</p><div class="portfolio-grid">${galleryItems.map((s,i)=>portfolioCard(s,i)).join('')}</div></section>${contactBand('Prepoznajete nešto za svoje dvorište?')}`;
 await writeFile(new URL('radovi.html',root),documentPage({title:'Radovi i ideje',description:'Fotografija izvedenih drvenih baštica i označene idejne vizualizacije nadstrešnica, letnjikovaca i garaža.',active:'radovi.html',content:worksContent,dialogs:galleryDialog,image:'bastice.webp'}));
 
-const contactSection = home.match(/<section class="contact section"[\s\S]*?<\/section>/)[0].replace('class="contact section"','class="contact section standalone-contact"').replace('<h2 id="contact-title">','<h1 id="contact-title">').replace('nešto vaše.</h2>','nešto vaše.</h1>');
-const contactContent = `${crumbs('Kontakt')}${contactSection}<section class="contact-preparation section container"><div><h2>Za lakši prvi razgovor.</h2><p>Ne morate znati sve odgovore. Fotografija prostora je često najbolji početak.</p></div><div class="contact-checklist"><article><h3>Vaš prostor</h3><p>Lokacija, okvirne mere i fotografija iz nekoliko uglova.</p></article><article><h3>Vaša ideja</h3><p>Šta želite da napravite i kako planirate da koristite prostor.</p></article><article><h3>Vaše želje</h3><p>Omiljeni materijal, završna obrada ili primer koji vam se dopada.</p></article></div></section>`;
+const contactSection = home.match(/<section class="contact section"[\s\S]*?<\/section>/)[0].replace('class="contact section"','class="contact section standalone-contact"').replace('class="contact-copy" data-reveal','class="contact-copy"').replace('<h2 id="contact-title">Napravimo<br>nešto vaše.</h2>',`<h1 id="contact-title">${lines('Napravimo<br>nešto vaše.')}</h1>`);
+const contactContent = `${crumbs('Kontakt')}${contactSection}<section class="contact-preparation section container"><div data-reveal><h2>Za lakši prvi razgovor.</h2><p>Ne morate znati sve odgovore. Fotografija prostora je često najbolji početak.</p></div><div class="contact-checklist"><article data-reveal><h3>Vaš prostor</h3><p>Lokacija, okvirne mere i fotografija iz nekoliko uglova.</p></article><article data-reveal><h3>Vaša ideja</h3><p>Šta želite da napravite i kako planirate da koristite prostor.</p></article><article data-reveal><h3>Vaše želje</h3><p>Omiljeni materijal, završna obrada ili primer koji vam se dopada.</p></article></div></section>`;
 await writeFile(new URL('kontakt.html',root),documentPage({title:'Kontakt',description:'Javite se Haus Majstoru Nemanji na 061 666 9378 ili pripremite WhatsApp upit za vaš projekat. Srbija, dolazak na teren.',active:'kontakt.html',content:contactContent,dialogs:messageDialog,bodyClass:'contact-page'}));
-console.log('Created 8 pages and connected the homepage navigation.');
+console.log(argv.includes('--inner-only') ? 'Created 8 inner pages.' : 'Created 8 pages and connected the homepage navigation.');
